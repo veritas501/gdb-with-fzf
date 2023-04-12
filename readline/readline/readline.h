@@ -185,6 +185,7 @@ extern int rl_paste_from_clipboard PARAMS((int, int));
 
 /* Bindable commands for incremental searching. */
 extern int rl_reverse_search_history PARAMS((int, int));
+extern int rl_fzf_search_history PARAMS((int, int));
 extern int rl_forward_search_history PARAMS((int, int));
 
 /* Bindable keyboard macro commands. */

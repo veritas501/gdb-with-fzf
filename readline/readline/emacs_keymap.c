@@ -50,7 +50,7 @@ KEYMAP_ENTRY_ARRAY emacs_standard_keymap = {
   { ISFUNC, rl_operate_and_get_next },		/* Control-o */
   { ISFUNC, rl_get_previous_history },		/* Control-p */
   { ISFUNC, rl_quoted_insert },			/* Control-q */
-  { ISFUNC, rl_reverse_search_history },	/* Control-r */
+  { ISFUNC, rl_fzf_search_history },      /* Control-r */
   { ISFUNC, rl_forward_search_history },	/* Control-s */
   { ISFUNC, rl_transpose_chars },		/* Control-t */
   { ISFUNC, rl_unix_line_discard },		/* Control-u */

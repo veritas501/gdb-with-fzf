@@ -32,6 +32,7 @@
 #endif
 
 #include <sys/types.h>
+#include <sys/wait.h>
 
 #include <stdio.h>
 
@@ -134,6 +135,112 @@ int
 rl_reverse_search_history (int sign, int key)
 {
   return (rl_search_history (-sign, key));
+}
+
+/* If NEW_LINE differs from what is in the readline line buffer, add an
+   undo record to get from the readline line buffer contents to the new
+   line and make NEW_LINE the current readline line. */
+static void
+maybe_make_readline_line (char *new_line)
+{
+  if (new_line && strcmp (new_line, rl_line_buffer) != 0)
+    {
+      rl_point = rl_end;
+
+      rl_add_undo (UNDO_BEGIN, 0, 0, 0);
+      rl_delete_text (0, rl_point);
+      rl_point = rl_end = rl_mark = 0;
+      rl_insert_text (new_line);
+      rl_add_undo (UNDO_END, 0, 0, 0);
+    }
+}
+
+int
+rl_fzf_search_history (int sign, int key)
+{
+  int outbound[2];
+  int inbound[2];
+
+  if (pipe(outbound) || pipe(inbound)) {
+    return -1;
+  }
+
+  int parent_read  = inbound[0];
+  int parent_write = outbound[1];
+  int child_read   = outbound[0];
+  int child_write  = inbound[1];
+
+  pid_t child = fork();
+  if (child == 0) {
+    // In child
+    dup2(child_read, 0); 	// setup stdin
+    dup2(child_write, 1); 	// setup stdout
+
+    close(parent_read);
+    close(parent_write);
+
+    // Pass the current prompt into fzf as its initial search string. Use environment variables to
+    // get around the need for escaping quotes in commands
+    setenv("RL_LINE_BUFFER", rl_line_buffer, 1);
+
+    char *argv[] = {
+	"/bin/sh",
+	"-c",
+	"fzf --print0 --read0 --tiebreak=index --no-multi --height=40\% --layout=reverse "
+	  "--tac $GDB_FZF_OPTS --query=\"$RL_LINE_BUFFER\"",
+	NULL
+    };
+    execve(argv[0], argv, environ);
+    exit(-1);			// if execve returns it failed
+  }
+
+  close(child_read);
+  close(child_write);
+
+  rl_crlf();
+
+  HIST_ENTRY **hlist = history_list();
+
+  FILE *in  = fdopen(parent_read, "r");
+  FILE *out = fdopen(parent_write, "w");
+
+  setvbuf(in,  NULL, _IONBF, 0);
+  setvbuf(out, NULL, _IOFBF, 4096);
+
+  HIST_ENTRY *hentry;
+  for (int i = 0; hlist && (hentry = hlist[i]); i++) {
+    fputs(hentry->line, out);
+    fputc(0, out);
+  }
+
+  fclose(out);
+
+  #define MAX_CMD_LEN 256
+  char gdb_cmd[MAX_CMD_LEN];
+  gdb_cmd[MAX_CMD_LEN-1] = '\0';
+
+  // Read output from FZF until a NULL byte is encountered
+  int c;
+  for (int i = 0; i < MAX_CMD_LEN-1; i++) {
+    c = fgetc(in);
+    if (c == EOF) {  		// Failed to read until a null byte so abort with an empty command
+      gdb_cmd[0] = '\0';
+      break;
+    }
+    gdb_cmd[i] = (char) c;
+    if (c == '\0') break;
+  }
+
+  // Wait for the child to terminate. If it doesn't terminate, the program will just hang and we'll
+  // know there's an issue with the child not exiting.
+  waitpid(child, NULL, 0);
+
+  // Don't bother checking for a success return code b/c sometimes we kill it w/ C-c
+
+  maybe_make_readline_line(gdb_cmd);
+  rl_forced_update_display();
+
+  return 0;
 }
 
 /* Search forwards through the history looking for a string which is typed
