@@ -8,13 +8,13 @@ This is a patch for GDB that integrates [FZF fuzzy finder](https://github.com/ju
 
 follow https://github.com/junegunn/fzf#installation
 or just try
-```
+```bash
 sudo apt install fzf
 ```
 
 ## Build gdb
 
-```
+```bash
 # Get the source code
 git clone https://github.com/veritas501/gdb-with-fzf.git --depth 1
 
@@ -48,7 +48,7 @@ Press ctrl+r to use it.
 
 Customize FZF options with the environment variable GDB_FZF_OPTS.
 
-```
+```bash
 # E.g., change the layout
 export GDB_FZF_OPTS='--layout=reverse-list'
 ```
